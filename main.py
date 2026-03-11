@@ -2,36 +2,60 @@ from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
+from langchain_tavily import TavilySearch
 
 from langchain.agents import create_agent
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from tavily import TavilyClient
+from pydantic import BaseModel, Field
+from typing import List
 
 load_dotenv()
 
-tavily = TavilyClient()
+class Source(BaseModel): 
+    """Schema for a source used by the agent"""
 
-@tool
-def search(query: str) -> str:
-    """
-    Tool that searches over the internet
-    Args:
-        query: The query to search for
-    Returns:
-        The search result
-    """
-    print(f"Searching for {query}...")
-    return tavily.search(query=query)
+    url: str = Field(description="The URL of the source")
+
+class AgentResponse(BaseModel):
+    """Schema for agent response with answer and sources"""
+
+    answer: str = Field(description="The agent's anser to the question")
+    sources: List[Source] = Field(default_factory=list, description="List of sources used to generate the answers")
+
+
+# tavily = TavilyClient()
+
+# @tool
+# def search(query: str) -> str:
+#     """
+#     Tool that searches over the internet
+#     Args:
+#         query: The query to search for
+#     Returns:
+#         The search result
+#     """
+#     print(f"Searching for {query}...")
+#     return tavily.search(query=query)
 
 llm = ChatOllama(temperature=0, model="llama3.2")
-tools=[search]
-agent = create_agent(model=llm, tools=tools)
+tools=[TavilySearch()]
+agent = create_agent(model=llm, tools=tools, response_format=AgentResponse)
 
 
 def main():
     print("Hello from langchain-course!")
-    result = agent.invoke({"messages":HumanMessage(content="What is the weather in Tokyo?")})
+    result = agent.invoke(
+        {
+            "messages":HumanMessage(
+                content="Search for 3 job postings for an AI Engineer using Langchain in the bay area " \
+                "on LinkedIn and list their details."
+            )
+        }
+    )
+    structured_response = result["output"]
+
     print(result)
 #     information = """
 #     Elon Reeve Musk (/ˈiːlɒn/ EE-lon; born June 28, 1971) is a businessman and entrepreneur known for his leadership of Tesla, SpaceX, Twitter, and xAI. Musk has been the wealthiest person in the world since 2025; as of February 2026, Forbes estimates his net worth to be around US$852 billion.
